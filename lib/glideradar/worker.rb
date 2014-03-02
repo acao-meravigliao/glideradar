@@ -16,7 +16,7 @@ class SerialHandler < EventMachine::Connection
     @my_lat = 0
     @my_lng = 0
 
-    @objects = {}
+    @pending_updates = {}
   end
 
   def on_data(&blk)
@@ -75,7 +75,15 @@ puts "NMEA CHK INCORRECT"
   def handle_gprmc(line)
     (time, warning, lat, lat_dir, lng, lng_dir, sog, cog, date, mag_var) = nmea_parse(line)
 
-    @time = nil # TODO
+    tm = time.match(/^([0-9]{2})([0-9]{2})([0-9]{2}\.[0-9]+)$/)
+    dm = date.match(/^([0-9]{2})([0-9]{2})([0-9]{2})$/)
+
+    if dm && tm
+      @time = Time.utc(dm[3].to_i + 2000, dm[2].to_i, dm[1].to_i, tm[1].to_i, tm[2].to_i, tm[3].to_f)
+    else
+      @time = nil
+    end
+
     @my_lat = (lat[0..1].to_f + lat[2..-1].to_f / 60) * (lat_dir == 'N' ? 1 : -1)
     @my_lng = (lng[0..2].to_f + lng[3..-1].to_f / 60) * (lng_dir == 'E' ? 1 : -1)
     @my_sog = sog.to_f
@@ -101,6 +109,18 @@ puts "NMEA CHK INCORRECT"
     })
 
 #    handle_pflaa('0,29,-16,-14,2,DF0855,100,,0,-0.1,1')
+
+    if @pending_updates.any?
+puts "SENDING UPDATES #{@pending_updates}"
+      worker.producer.publish({
+        :msg_type => :traffic_update,
+        :msg => {
+          :objects => @pending_updates,
+        },
+       })
+    end
+
+    @pending_updates = {}
   end
 
   def handle_pflau(line)
@@ -122,21 +142,20 @@ puts "NMEA CHK INCORRECT"
 
 puts "PFLAA: #{line}"
 
-
     (alarm_level, rel_north, rel_east, rel_vertical, id_type, id, track, turn_rate, gs, climb_rate, type) = nmea_parse(line)
 
-    @objects[id] = {
+    plane = nil
+
+    @pending_updates[id] = {
       :lat => @my_lat + rel_north.to_f / 111111,
       :lng => @my_lng + rel_east.to_f / (111111 * Math.cos((@my_lat / 180) * Math::PI)),
-      :alt => @my_alt + rel_vertical.to_f
+      :alt => @my_alt + rel_vertical.to_f,
+      :cog => track.to_i,
+      :sog => gs.to_f,
+      :tr => turn_rate.to_i,
+      :cr => climb_rate.to_f,
+      :at => type,
     }
-
-    worker.producer.publish({
-      :msg_type => :traffic_update,
-      :msg => {
-        :objects => @objects,
-      },
-    })
   end
 
   def nmea_parse(line)
