@@ -1,0 +1,19 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+require 'bundler/setup'
+
+begin
+  require "tomte/agents"
+rescue LoadError
+  tomte_path = File.expand_path('../../../../tomte-agents/lib', __FILE__)
+  $:.unshift(tomte_path)
+  require "tomte/agents"
+end
+
+
+#
+# just starts the agent now
+#
+Tomte::Agents::Framework.setup(:async => true, :application => 'glideradar-sniff')
+Tomte::Agent::GlideradarSniff::new(:argv => ARGV).run!
