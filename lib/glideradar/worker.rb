@@ -25,6 +25,8 @@ class SerialHandler < EventMachine::Connection
   def receive_line(line)
 #    puts "AAAAAAAAAAAAA #{line}"
 
+    worker.raw_producer.publish(line, :expiration => 60000)
+
     if line =~ /\$([A-Z]+),(.*)\*([0-9A-F][0-9A-F])$/
       sum = line[1..-4].chars.inject(0) { |a,x| a ^ x.ord }
       chk = $3.to_i(16)
@@ -146,7 +148,14 @@ puts "PFLAA: #{line}"
 
     plane = nil
 
-    @pending_updates[id] = {
+    id_type_s = case id_type.to_i
+      when 1; 'icao'
+      when 2; 'flarm'
+      else; id_type.to_s
+    end
+
+    @pending_updates[id_type_s + ':' + id] = {
+      :type => type.to_i,
       :lat => @my_lat + rel_north.to_f / 111111,
       :lng => @my_lng + rel_east.to_f / (111111 * Math.cos((@my_lat / 180) * Math::PI)),
       :alt => @my_alt + rel_vertical.to_f,
@@ -154,7 +163,6 @@ puts "PFLAA: #{line}"
       :sog => gs.to_f,
       :tr => turn_rate.to_i,
       :cr => climb_rate.to_f,
-      :at => type,
     }
   end
 
@@ -166,8 +174,9 @@ end
 class Worker < Tomte::Worker
 
   attr_accessor :producer
+  attr_accessor :raw_producer
 
-  bus :service, :enveloper => Tomte::Protocol::Enveloper::Generic do |ep|
+  bus :service do |ep|
 
     @producer = ep.producer(
       :exchange => config.glideradar[:exchange],
@@ -178,11 +187,38 @@ class Worker < Tomte::Worker
       }
     )
 
-    @producer.connect!(:errback => lambda { |c,cc| exit }) do
-      serial = SerialPort.new('/dev/ttyUSB0', :baud => 57600, :data_bits => 8, :stop_bits => 1, :parity => SerialPort::NONE)
+    @raw_producer = ep.producer(
+      :enveloper => Tomte::Protocol::Enveloper::Null.new,
+      :exchange => config.glideradar[:raw_exchange],
+      :exchange_type => :topic,
+      :exchange_options => {
+        :passive => false,
+        :durable => true,
+      },
+    )
 
-      EM.attach(serial, SerialHandler)
+    @producer.connect!(:errback => lambda { |c,cc| exit }) do
+      if @producer.connected? && @raw_producer.connected?
+        all_producers_ready
+      end
     end
+
+    @raw_producer.connect!(:errback => lambda { |c,cc| exit }) do
+      if @producer.connected? && @raw_producer.connected?
+        all_producers_ready
+      end
+    end
+
+  end
+
+  def all_producers_ready
+    serial = SerialPort.new(config.glideradar[:serial][:device],
+      :baud => config.glideradar[:serial][:speed],
+      :data_bits => 8,
+      :stop_bits => 1,
+      :parity => SerialPort::NONE)
+
+    EM.attach(serial, SerialHandler)
   end
 
   def init(args = {})
