@@ -213,10 +213,10 @@ class Worker < Tomte::Worker
 
   def all_producers_ready
     serial = SerialPort.new(config.glideradar[:serial][:device],
-      :baud => config.glideradar[:serial][:speed],
-      :data_bits => 8,
-      :stop_bits => 1,
-      :parity => SerialPort::NONE)
+      'baud' => config.glideradar[:serial][:speed],
+      'data_bits' => 8,
+      'stop_bits' => 1,
+      'parity' => SerialPort::NONE)
 
     EM.attach(serial, SerialHandler)
   end
