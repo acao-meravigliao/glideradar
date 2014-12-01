@@ -1,4 +1,11 @@
-# -*- encoding: utf-8 -*-
+#
+# Copyright (C) 2014-2014, Daniele Orlandi
+#
+# Author:: Daniele Orlandi <daniele@orlandi.com>
+#
+# License:: You can redistribute it and/or modify it under the terms of the LICENSE file.
+#
+
 $:.push File.expand_path('../lib', __FILE__)
 require 'glideradar/version'
 
@@ -20,8 +27,8 @@ Gem::Specification.new do |s|
 
   # specify any dependencies here; for example:
   # s.add_development_dependency 'rspec'
-  s.add_runtime_dependency 'tomte-core'
-  s.add_runtime_dependency 'tomte-agents'
-  s.add_runtime_dependency 'tomte-protocol'
-  s.add_runtime_dependency 'serialport'
+
+  s.add_runtime_dependency 'ygg_agent', '~> 2.1.0'
+  s.add_runtime_dependency 'serialport', '~> 1.3.1'
+  s.add_runtime_dependency 'activesupport'
 end

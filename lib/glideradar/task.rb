@@ -1,4 +1,3 @@
-#!/usr/bin/env ruby2.1
 #
 # Copyright (C) 2014-2014, Daniele Orlandi
 #
@@ -7,6 +6,11 @@
 # License:: You can redistribute it and/or modify it under the terms of the LICENSE file.
 #
 
-require 'glideradar'
+require 'ygg/agent/task'
 
-Glideradar::App.run_as_main!
+module Glideradar
+
+class Task < Ygg::Agent::Task
+end
+
+end
