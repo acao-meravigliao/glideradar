@@ -103,9 +103,7 @@ class App < Ygg::Agent::Base
 
   def receive_line(line)
 
-    #log.debug "AAAAAAAAAAAAA #{line}"
-
-    line.chomp!
+#    log.debug "AAAAAAAAAAAAA #{line}"
 
     @amqp.tell AM::AMQP::MsgPublish.new(
       destination: @agentcfg.raw_exchange,
@@ -120,6 +118,8 @@ class App < Ygg::Agent::Base
         },
       }
     )
+
+    line.chomp!
 
     if line =~ /\$([A-Z]+),(.*)\*([0-9A-F][0-9A-F])$/
       sum = line[1..-4].chars.inject(0) { |a,x| a ^ x.ord }
@@ -206,7 +206,6 @@ class App < Ygg::Agent::Base
         },
       },
       options: {
-        content_type: 'application/json',
         type: 'STATION_UPDATE',
         persistent: false,
         mandatory: false,
@@ -227,7 +226,6 @@ class App < Ygg::Agent::Base
           },
         },
         options: {
-          content_type: 'application/json',
           type: 'TRAFFIC_UPDATE',
           persistent: false,
           mandatory: false,
@@ -254,7 +252,6 @@ class App < Ygg::Agent::Base
           },
         },
         options: {
-          content_type: 'application/json',
           type: 'TRAFFIC_UPDATE',
           persistent: false,
           mandatory: false,
