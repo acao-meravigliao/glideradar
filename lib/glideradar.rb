@@ -28,6 +28,12 @@ class App < Ygg::Agent::Base
     app_config_files << '/etc/yggdra/glideradar.conf'
   end
 
+  def prepare_options(o)
+    super
+
+    o.on('--debug-serial', 'Debug serial messages') { |v| config.debug_serial = true }
+  end
+
   def agent_boot
     @my_alt = 0
     @my_lat = 0
@@ -85,7 +91,9 @@ class App < Ygg::Agent::Base
 
   def receive_line(line)
 
-#    log.debug "AAAAAAAAAAAAA #{line}"
+    line.chomp!
+
+    log.debug "<<< #{line}" if config.debug_serial
 
     @amqp.tell AM::AMQP::MsgPublish.new(
       destination: mycfg.raw_exchange,
@@ -99,9 +107,7 @@ class App < Ygg::Agent::Base
         headers: {
         },
       }
-    )
-
-    line.chomp!
+    ) if mycfg.raw_exchange
 
     if line =~ /\$([A-Z]+),(.*)\*([0-9A-F][0-9A-F])$/
       sum = line[1..-4].chars.inject(0) { |a,x| a ^ x.ord }
