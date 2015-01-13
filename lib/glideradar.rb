@@ -9,6 +9,8 @@
 
 require 'ygg/agent/base'
 
+require 'ygg/app/line_buffer'
+
 require 'glideradar/version'
 require 'glideradar/task'
 
@@ -16,37 +18,17 @@ require 'serialport'
 
 module Glideradar
 
-class LineBuffer
-  def initialize(line_received_cb:)
-    @line_received_cb = line_received_cb
-
-    @buf = ''
-  end
-
-  def push(data)
-    @buf << data
-
-    @buf.each_line do |line|
-      break unless line.end_with?("\n")
-
-      @buf.slice!(0..line.length)
-
-      @line_received_cb.call(line)
-    end
-  end
-end
-
 class App < Ygg::Agent::Base
+  self.app_name = 'glideradar'
+  self.app_version = VERSION
   self.task_class = Task
 
   def prepare_default_config
-    @config_files << File.join(File.dirname(__FILE__), '..', 'config', 'glideradar.conf')
-    @config_files << '/etc/yggdra/glideradar.conf'
+    app_config_files << File.join(File.dirname(__FILE__), '..', 'config', 'glideradar.conf')
+    app_config_files << '/etc/yggdra/glideradar.conf'
   end
 
   def agent_boot
-    @agentcfg = @config[:glideradar]
-
     @my_alt = 0
     @my_lat = 0
     @my_lng = 0
@@ -56,7 +38,7 @@ class App < Ygg::Agent::Base
     @gps_status = nil
 
     @amqp.ask(AM::AMQP::MsgDeclareExchange.new(
-      name: @agentcfg.exchange,
+      name: mycfg.exchange,
       type: :topic,
       options: {
         durable: true,
@@ -65,7 +47,7 @@ class App < Ygg::Agent::Base
     )).value
 
     @amqp.ask(AM::AMQP::MsgDeclareExchange.new(
-      name: @agentcfg.exchange,
+      name: mycfg.exchange,
       type: :topic,
       options: {
         durable: true,
@@ -73,10 +55,10 @@ class App < Ygg::Agent::Base
       }
     )).value
 
-    @line_buffer = LineBuffer.new(line_received_cb: method(:receive_line))
+    @line_buffer = Ygg::App::LineBuffer.new(line_received_cb: method(:receive_line))
 
-    @serialport = SerialPort.new(@agentcfg.serial.device,
-      'baud' => @agentcfg.serial.speed,
+    @serialport = SerialPort.new(mycfg.serial.device,
+      'baud' => mycfg.serial.speed,
       'data_bits' => 8,
       'stop_bits' => 1,
       'parity' => SerialPort::NONE)
@@ -106,7 +88,7 @@ class App < Ygg::Agent::Base
 #    log.debug "AAAAAAAAAAAAA #{line}"
 
     @amqp.tell AM::AMQP::MsgPublish.new(
-      destination: @agentcfg.raw_exchange,
+      destination: mycfg.raw_exchange,
       payload: line.dup,
       options: {
         content_type: 'application/octet-stream',
@@ -164,7 +146,7 @@ class App < Ygg::Agent::Base
     @gps_pdop = gps_pdop.to_f
     @gps_hdop = gps_hdop.to_f
     @gps_vdop = gps_vdop.to_f
-    
+
     @gps_fix_type = gps_fix_type.to_i
   end
 
@@ -186,7 +168,7 @@ class App < Ygg::Agent::Base
     @my_cog = cog.to_i
 
     @amqp.tell AM::AMQP::MsgPublish.new(
-      destination: @agentcfg.exchange,
+      destination: mycfg.exchange,
       payload: {
         :msg_type => :station_update,
         :msg => {
@@ -216,9 +198,10 @@ class App < Ygg::Agent::Base
 #    handle_pflaa('0,29,-16,-14,2,DF0855,100,,0,-0.1,1')
 
     if @pending_updates.any?
-      log.debug "SENDING UPDATES #{@pending_updates}"
+#      log.debug "SENDING UPDATES #{@pending_updates}"
+
       @amqp.tell AM::AMQP::MsgPublish.new(
-        destination: @agentcfg.raw_exchange,
+        destination: mycfg.raw_exchange,
         payload: {
           :msg_type => :traffic_update,
           :msg => {
@@ -244,7 +227,7 @@ class App < Ygg::Agent::Base
       @gps_status = gps_status
 
       @amqp.tell AM::AMQP::MsgPublish.new(
-        destination: @agentcfg.exchange,
+        destination: mycfg.exchange,
         payload: {
           :msg_type => :status_update,
           :msg => {
@@ -263,7 +246,7 @@ class App < Ygg::Agent::Base
 
   def handle_pflaa(line)
 
-    log.debug "PFLAA: #{line}"
+#    log.debug "PFLAA: #{line}"
 
     (alarm_level, rel_north, rel_east, rel_vertical, id_type, id, track, turn_rate, gs, climb_rate, type) = nmea_parse(line)
 
