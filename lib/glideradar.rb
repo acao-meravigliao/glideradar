@@ -52,15 +52,6 @@ class App < Ygg::Agent::Base
       }
     )).value
 
-    @amqp.ask(AM::AMQP::MsgDeclareExchange.new(
-      name: mycfg.exchange,
-      type: :topic,
-      options: {
-        durable: true,
-        auto_delete: false,
-      }
-    )).value
-
     @line_buffer = Ygg::App::LineBuffer.new(line_received_cb: method(:receive_line))
 
     @serialport = SerialPort.new(mycfg.serial.device,
