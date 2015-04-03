@@ -167,21 +167,21 @@ class App < Ygg::Agent::Base
     @amqp.tell AM::AMQP::MsgPublish.new(
       destination: mycfg.exchange,
       payload: {
-        :msg_type => :station_update,
-        :msg => {
-          :station_id => 'FLARM',
-          :time => @time,
-          :lat => @my_lat,
-          :lng => @my_lng,
-          :alt => @my_alt,
-          :cog => @my_cog,
-          :sog => @my_sog,
-          :gps_fix_qual => @gps_fix_qual,
-          :gps_sats     => @gps_sats,
-          :gps_fix_type => @gps_fix_type,
-          :gps_pdop     => @gps_pdop,
-          :gps_hdop     => @gps_hdop,
-          :gps_vdop     => @gps_vdop,
+        msg_type: :station_update,
+        msg: {
+          station_id: 'FLARM',
+          time: @time,
+          lat: @my_lat,
+          lng: @my_lng,
+          alt: @my_alt,
+          cog: @my_cog,
+          sog: @my_sog,
+          gps_fix_qual: @gps_fix_qual,
+          gps_sats: @gps_sats,
+          gps_fix_type: @gps_fix_type,
+          gps_pdop: @gps_pdop,
+          gps_hdop: @gps_hdop,
+          gps_vdop: @gps_vdop,
         },
       },
       options: {
@@ -198,11 +198,11 @@ class App < Ygg::Agent::Base
 #      log.debug "SENDING UPDATES #{@pending_updates}"
 
       @amqp.tell AM::AMQP::MsgPublish.new(
-        destination: mycfg.raw_exchange,
+        destination: mycfg.exchange,
         payload: {
-          :msg_type => :traffic_update,
-          :msg => {
-            :objects => @pending_updates,
+          msg_type: :traffic_update,
+          msg: {
+            objects: @pending_updates,
           },
         },
         options: {
@@ -226,9 +226,9 @@ class App < Ygg::Agent::Base
       @amqp.tell AM::AMQP::MsgPublish.new(
         destination: mycfg.exchange,
         payload: {
-          :msg_type => :status_update,
-          :msg => {
-            :gps_status => gps_status,
+          msg_type: :status_update,
+          msg: {
+            gps_status: gps_status,
           },
         },
         options: {
@@ -256,14 +256,15 @@ class App < Ygg::Agent::Base
     end
 
     @pending_updates[id_type_s + ':' + id] = {
-      :type => type.to_i,
-      :lat => @my_lat + rel_north.to_f / 111111,
-      :lng => @my_lng + rel_east.to_f / (111111 * Math.cos((@my_lat / 180) * Math::PI)),
-      :alt => @my_alt + rel_vertical.to_f,
-      :cog => track.to_i,
-      :sog => gs.to_f,
-      :tr => turn_rate.to_i,
-      :cr => climb_rate.to_f,
+      ts: @time, # We have no better timestamp for now
+      type: type.to_i,
+      lat: @my_lat + rel_north.to_f / 111111,
+      lng: @my_lng + rel_east.to_f / (111111 * Math.cos((@my_lat / 180) * Math::PI)),
+      alt: @my_alt + rel_vertical.to_f,
+      cog: track.to_i,
+      sog: gs.to_f,
+      tr: turn_rate.to_i,
+      cr: climb_rate.to_f,
     }
   end
 
