@@ -86,19 +86,21 @@ class App < Ygg::Agent::Base
 
     log.debug "<<< #{line}" if config.debug_serial
 
-    @amqp.tell AM::AMQP::MsgPublish.new(
-      destination: mycfg.raw_exchange,
-      payload: line.dup,
-      options: {
-        content_type: 'application/octet-stream',
-        type: 'RAW',
-        persistent: false,
-        mandatory: false,
-        expiration: 60000,
-        headers: {
-        },
-      }
-    ) if mycfg.raw_exchange
+    if mycfg.raw_exchange
+      @amqp.tell AM::AMQP::MsgPublish.new(
+        destination: mycfg.raw_exchange,
+        payload: line.dup,
+        options: {
+          content_type: 'application/octet-stream',
+          type: 'RAW',
+          persistent: false,
+          mandatory: false,
+          expiration: 60000,
+          headers: {
+          },
+        }
+      )
+    end
 
     if line =~ /\$([A-Z]+),(.*)\*([0-9A-F][0-9A-F])$/
       sum = line[1..-4].chars.inject(0) { |a,x| a ^ x.ord }
@@ -167,22 +169,19 @@ class App < Ygg::Agent::Base
     @amqp.tell AM::AMQP::MsgPublish.new(
       destination: mycfg.exchange,
       payload: {
-        msg_type: :station_update,
-        msg: {
-          station_id: 'FLARM',
-          time: @time,
-          lat: @my_lat,
-          lng: @my_lng,
-          alt: @my_alt,
-          cog: @my_cog,
-          sog: @my_sog,
-          gps_fix_qual: @gps_fix_qual,
-          gps_sats: @gps_sats,
-          gps_fix_type: @gps_fix_type,
-          gps_pdop: @gps_pdop,
-          gps_hdop: @gps_hdop,
-          gps_vdop: @gps_vdop,
-        },
+        station_id: mycfg.station_name,
+        time: @time,
+        lat: @my_lat,
+        lng: @my_lng,
+        alt: @my_alt,
+        cog: @my_cog,
+        sog: @my_sog,
+        gps_fix_qual: @gps_fix_qual,
+        gps_sats: @gps_sats,
+        gps_fix_type: @gps_fix_type,
+        gps_pdop: @gps_pdop,
+        gps_hdop: @gps_hdop,
+        gps_vdop: @gps_vdop,
       },
       options: {
         type: 'STATION_UPDATE',
@@ -200,10 +199,8 @@ class App < Ygg::Agent::Base
       @amqp.tell AM::AMQP::MsgPublish.new(
         destination: mycfg.exchange,
         payload: {
-          msg_type: :traffic_update,
-          msg: {
-            objects: @pending_updates,
-          },
+          station_id: mycfg.station_name,
+          objects: @pending_update
         },
         options: {
           type: 'TRAFFIC_UPDATE',
