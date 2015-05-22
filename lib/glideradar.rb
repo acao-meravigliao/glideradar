@@ -200,7 +200,7 @@ class App < Ygg::Agent::Base
         destination: mycfg.exchange,
         payload: {
           station_id: mycfg.station_name,
-          objects: @pending_update
+          objects: @pending_updates,
         },
         options: {
           type: 'TRAFFIC_UPDATE',
