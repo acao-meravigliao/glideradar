@@ -183,11 +183,11 @@ class App < Ygg::Agent::Base
         gps_hdop: @gps_hdop,
         gps_vdop: @gps_vdop,
       },
+      routing_key: mycfg.station_name + '.' + 'STATION_UPDATE',
       options: {
         type: 'STATION_UPDATE',
         persistent: false,
         mandatory: false,
-        expiration: 60000,
       }
     )
 
@@ -202,11 +202,11 @@ class App < Ygg::Agent::Base
           station_id: mycfg.station_name,
           objects: @pending_updates,
         },
+        routing_key: mycfg.station_name + '.' + 'TRAFFIC_UPDATE',
         options: {
           type: 'TRAFFIC_UPDATE',
           persistent: false,
           mandatory: false,
-          expiration: 60000,
         }
       )
     end
@@ -223,16 +223,13 @@ class App < Ygg::Agent::Base
       @amqp.tell AM::AMQP::MsgPublish.new(
         destination: mycfg.exchange,
         payload: {
-          msg_type: :status_update,
-          msg: {
-            gps_status: gps_status,
-          },
+          gps_status: gps_status,
         },
+        routing_key: mycfg.station_name + '.' + 'STATION_UPDATE',
         options: {
-          type: 'TRAFFIC_UPDATE',
+          type: 'STATION_UPDATE',
           persistent: false,
           mandatory: false,
-          expiration: 60000,
         }
       )
     end
