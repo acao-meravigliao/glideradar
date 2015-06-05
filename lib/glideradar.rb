@@ -200,6 +200,7 @@ class App < Ygg::Agent::Base
         destination: mycfg.exchange,
         payload: {
           station_id: mycfg.station_name,
+          ts: @time,
           objects: @pending_updates,
         },
         routing_key: mycfg.station_name + '.' + 'TRAFFIC_UPDATE',
@@ -223,6 +224,8 @@ class App < Ygg::Agent::Base
       @amqp.tell AM::AMQP::MsgPublish.new(
         destination: mycfg.exchange,
         payload: {
+          station_id: mycfg.station_name,
+          time: @time,
           gps_status: gps_status,
         },
         routing_key: mycfg.station_name + '.' + 'STATION_UPDATE',
@@ -238,6 +241,8 @@ class App < Ygg::Agent::Base
   def handle_pflaa(line)
 
 #    log.debug "PFLAA: #{line}"
+
+    return if !@time
 
     (alarm_level, rel_north, rel_east, rel_vertical, id_type, id, track, turn_rate, gs, climb_rate, type) = nmea_parse(line)
 
