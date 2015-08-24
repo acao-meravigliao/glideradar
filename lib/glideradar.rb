@@ -249,8 +249,10 @@ class App < Ygg::Agent::Base
     plane = nil
 
     id_type_s = case id_type.to_i
+      when 0; 'unk'
       when 1; 'icao'
       when 2; 'flarm'
+      when 3; 'anon'
       else; id_type.to_s
     end
 
