@@ -43,13 +43,12 @@ class App < Ygg::Agent::Base
 
     @gps_status = nil
 
-    @amqp.ask(AM::AMQP::MsgDeclareExchange.new(
+    @amqp.ask(AM::AMQP::MsgExchangeDeclare.new(
+      channel_id: @amqp_chan,
       name: mycfg.exchange,
       type: :topic,
-      options: {
-        durable: true,
-        auto_delete: false,
-      }
+      durable: true,
+      auto_delete: false,
     )).value
 
     @line_buffer = Ygg::App::LineBuffer.new(line_received_cb: method(:receive_line))
@@ -88,16 +87,15 @@ class App < Ygg::Agent::Base
 
     if mycfg.raw_exchange
       @amqp.tell AM::AMQP::MsgPublish.new(
-        destination: mycfg.raw_exchange,
+        channel_id: @amqp_chan,
+        exchange: mycfg.raw_exchange,
         payload: line.dup,
-        options: {
+        persistant: false,
+        mandatory: false,
+        headers: {
           content_type: 'application/octet-stream',
           type: 'RAW',
-          persistent: false,
-          mandatory: false,
           expiration: 60000,
-          headers: {
-          },
         }
       )
     end
@@ -167,7 +165,8 @@ class App < Ygg::Agent::Base
     @my_cog = cog.to_i
 
     @amqp.tell AM::AMQP::MsgPublish.new(
-      destination: mycfg.exchange,
+      channel_id: @amqp_chan,
+      exchange: mycfg.exchange,
       payload: {
         station_id: mycfg.station_name,
         time: @time,
@@ -182,12 +181,13 @@ class App < Ygg::Agent::Base
         gps_pdop: @gps_pdop,
         gps_hdop: @gps_hdop,
         gps_vdop: @gps_vdop,
-      },
+      }.to_json,
       routing_key: mycfg.station_name + '.' + 'STATION_UPDATE',
-      options: {
+      persistant: false,
+      mandatory: false,
+      headers: {
+        content_type: 'application/json',
         type: 'STATION_UPDATE',
-        persistent: false,
-        mandatory: false,
       }
     )
 
@@ -197,17 +197,19 @@ class App < Ygg::Agent::Base
 #      log.debug "SENDING UPDATES #{@pending_updates}"
 
       @amqp.tell AM::AMQP::MsgPublish.new(
-        destination: mycfg.exchange,
+        channel_id: @amqp_chan,
+        exchange: mycfg.exchange,
         payload: {
           station_id: mycfg.station_name,
           ts: @time,
           objects: @pending_updates,
-        },
+        }.to_json,
         routing_key: mycfg.station_name + '.' + 'TRAFFIC_UPDATE',
-        options: {
+        persistant: false,
+        mandatory: false,
+        headers: {
+          content_type: 'application/json',
           type: 'TRAFFIC_UPDATE',
-          persistent: false,
-          mandatory: false,
         }
       )
     end
@@ -222,17 +224,19 @@ class App < Ygg::Agent::Base
       @gps_status = gps_status
 
       @amqp.tell AM::AMQP::MsgPublish.new(
-        destination: mycfg.exchange,
+        channel_id: @amqp_chan,
+        exchange: mycfg.exchange,
         payload: {
           station_id: mycfg.station_name,
           time: @time,
           gps_status: gps_status,
-        },
+        }.to_json,
         routing_key: mycfg.station_name + '.' + 'STATION_UPDATE',
-        options: {
+        persistant: false,
+        mandatory: false,
+        headers: {
+          content_type: 'application/json',
           type: 'STATION_UPDATE',
-          persistent: false,
-          mandatory: false,
         }
       )
     end
