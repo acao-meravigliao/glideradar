@@ -9,7 +9,7 @@
 
 require 'ygg/agent/base'
 
-require 'ygg/app/line_buffer'
+require 'vihai_io_buffer'
 
 require 'glideradar/version'
 require 'glideradar/task'
@@ -51,7 +51,7 @@ class App < Ygg::Agent::Base
       auto_delete: false,
     )).value
 
-    @line_buffer = Ygg::App::LineBuffer.new(line_received_cb: method(:receive_line))
+    @line_buffer = VihaiIoBuffer.new
 
     @serialport = SerialPort.new(mycfg.serial.device,
       'baud' => mycfg.serial.speed,
@@ -73,7 +73,10 @@ class App < Ygg::Agent::Base
         return
       end
 
-      @line_buffer.push(data)
+      @line_buffer << data
+      @line_buffer.each_line do |line|
+        receive_line(line)
+      end
     else
       super
     end
@@ -90,7 +93,7 @@ class App < Ygg::Agent::Base
         channel_id: @amqp_chan,
         exchange: mycfg.raw_exchange,
         payload: line.dup,
-        persistant: false,
+        persistent: false,
         mandatory: false,
         headers: {
           content_type: 'application/octet-stream',
@@ -183,7 +186,7 @@ class App < Ygg::Agent::Base
         gps_vdop: @gps_vdop,
       }.to_json,
       routing_key: mycfg.station_name + '.' + 'STATION_UPDATE',
-      persistant: false,
+      persistent: false,
       mandatory: false,
       headers: {
         content_type: 'application/json',
@@ -205,7 +208,7 @@ class App < Ygg::Agent::Base
           objects: @pending_updates,
         }.to_json,
         routing_key: mycfg.station_name + '.' + 'TRAFFIC_UPDATE',
-        persistant: false,
+        persistent: false,
         mandatory: false,
         headers: {
           content_type: 'application/json',
@@ -232,7 +235,7 @@ class App < Ygg::Agent::Base
           gps_status: gps_status,
         }.to_json,
         routing_key: mycfg.station_name + '.' + 'STATION_UPDATE',
-        persistant: false,
+        persistent: false,
         mandatory: false,
         headers: {
           content_type: 'application/json',
