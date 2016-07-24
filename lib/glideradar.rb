@@ -14,7 +14,7 @@ require 'vihai_io_buffer'
 require 'glideradar/version'
 require 'glideradar/task'
 
-require 'serialport'
+require 'serialport.rb'
 
 module Glideradar
 
