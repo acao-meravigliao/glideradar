@@ -9,12 +9,12 @@
 
 require 'ygg/agent/base'
 
-require 'ygg/app/line_buffer'
+require 'vihai_io_buffer'
 
 require 'glideradar/version'
 require 'glideradar/task'
 
-require 'serialport'
+require 'serialport.rb'
 
 module Glideradar
 
@@ -43,16 +43,15 @@ class App < Ygg::Agent::Base
 
     @gps_status = nil
 
-    @amqp.ask(AM::AMQP::MsgDeclareExchange.new(
+    @amqp.ask(AM::AMQP::MsgExchangeDeclare.new(
+      channel_id: @amqp_chan,
       name: mycfg.exchange,
       type: :topic,
-      options: {
-        durable: true,
-        auto_delete: false,
-      }
+      durable: true,
+      auto_delete: false,
     )).value
 
-    @line_buffer = Ygg::App::LineBuffer.new(line_received_cb: method(:receive_line))
+    @line_buffer = VihaiIoBuffer.new
 
     @serialport = SerialPort.new(mycfg.serial.device,
       'baud' => mycfg.serial.speed,
@@ -74,7 +73,10 @@ class App < Ygg::Agent::Base
         return
       end
 
-      @line_buffer.push(data)
+      @line_buffer << data
+      @line_buffer.each_line do |line|
+        receive_line(line)
+      end
     else
       super
     end
@@ -86,19 +88,20 @@ class App < Ygg::Agent::Base
 
     log.debug "<<< #{line}" if config.debug_serial
 
-    @amqp.tell AM::AMQP::MsgPublish.new(
-      destination: mycfg.raw_exchange,
-      payload: line.dup,
-      options: {
-        content_type: 'application/octet-stream',
-        type: 'RAW',
+    if mycfg.raw_exchange
+      @amqp.tell AM::AMQP::MsgPublish.new(
+        channel_id: @amqp_chan,
+        exchange: mycfg.raw_exchange,
+        payload: line.dup,
         persistent: false,
         mandatory: false,
-        expiration: 60000,
         headers: {
-        },
-      }
-    ) if mycfg.raw_exchange
+          content_type: 'application/octet-stream',
+          type: 'RAW',
+          expiration: 60000,
+        }
+      )
+    end
 
     if line =~ /\$([A-Z]+),(.*)\*([0-9A-F][0-9A-F])$/
       sum = line[1..-4].chars.inject(0) { |a,x| a ^ x.ord }
@@ -165,30 +168,29 @@ class App < Ygg::Agent::Base
     @my_cog = cog.to_i
 
     @amqp.tell AM::AMQP::MsgPublish.new(
-      destination: mycfg.exchange,
+      channel_id: @amqp_chan,
+      exchange: mycfg.exchange,
       payload: {
-        msg_type: :station_update,
-        msg: {
-          station_id: 'FLARM',
-          time: @time,
-          lat: @my_lat,
-          lng: @my_lng,
-          alt: @my_alt,
-          cog: @my_cog,
-          sog: @my_sog,
-          gps_fix_qual: @gps_fix_qual,
-          gps_sats: @gps_sats,
-          gps_fix_type: @gps_fix_type,
-          gps_pdop: @gps_pdop,
-          gps_hdop: @gps_hdop,
-          gps_vdop: @gps_vdop,
-        },
-      },
-      options: {
+        station_id: mycfg.station_name,
+        time: @time,
+        lat: @my_lat,
+        lng: @my_lng,
+        alt: @my_alt,
+        cog: @my_cog,
+        sog: @my_sog,
+        gps_fix_qual: @gps_fix_qual,
+        gps_sats: @gps_sats,
+        gps_fix_type: @gps_fix_type,
+        gps_pdop: @gps_pdop,
+        gps_hdop: @gps_hdop,
+        gps_vdop: @gps_vdop,
+      }.to_json,
+      routing_key: mycfg.station_name + '.' + 'STATION_UPDATE',
+      persistent: false,
+      mandatory: false,
+      headers: {
+        content_type: 'application/json',
         type: 'STATION_UPDATE',
-        persistent: false,
-        mandatory: false,
-        expiration: 60000,
       }
     )
 
@@ -198,18 +200,19 @@ class App < Ygg::Agent::Base
 #      log.debug "SENDING UPDATES #{@pending_updates}"
 
       @amqp.tell AM::AMQP::MsgPublish.new(
-        destination: mycfg.exchange,
+        channel_id: @amqp_chan,
+        exchange: mycfg.exchange,
         payload: {
-          msg_type: :traffic_update,
-          msg: {
-            objects: @pending_updates,
-          },
-        },
-        options: {
+          station_id: mycfg.station_name,
+          ts: @time,
+          objects: @pending_updates,
+        }.to_json,
+        routing_key: mycfg.station_name + '.' + 'TRAFFIC_UPDATE',
+        persistent: false,
+        mandatory: false,
+        headers: {
+          content_type: 'application/json',
           type: 'TRAFFIC_UPDATE',
-          persistent: false,
-          mandatory: false,
-          expiration: 60000,
         }
       )
     end
@@ -224,18 +227,19 @@ class App < Ygg::Agent::Base
       @gps_status = gps_status
 
       @amqp.tell AM::AMQP::MsgPublish.new(
-        destination: mycfg.exchange,
+        channel_id: @amqp_chan,
+        exchange: mycfg.exchange,
         payload: {
-          msg_type: :status_update,
-          msg: {
-            gps_status: gps_status,
-          },
-        },
-        options: {
-          type: 'TRAFFIC_UPDATE',
-          persistent: false,
-          mandatory: false,
-          expiration: 60000,
+          station_id: mycfg.station_name,
+          time: @time,
+          gps_status: gps_status,
+        }.to_json,
+        routing_key: mycfg.station_name + '.' + 'STATION_UPDATE',
+        persistent: false,
+        mandatory: false,
+        headers: {
+          content_type: 'application/json',
+          type: 'STATION_UPDATE',
         }
       )
     end
@@ -245,13 +249,17 @@ class App < Ygg::Agent::Base
 
 #    log.debug "PFLAA: #{line}"
 
+    return if !@time
+
     (alarm_level, rel_north, rel_east, rel_vertical, id_type, id, track, turn_rate, gs, climb_rate, type) = nmea_parse(line)
 
     plane = nil
 
     id_type_s = case id_type.to_i
+      when 0; 'unk'
       when 1; 'icao'
       when 2; 'flarm'
+      when 3; 'anon'
       else; id_type.to_s
     end
 
