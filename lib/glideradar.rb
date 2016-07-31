@@ -60,16 +60,16 @@ class App < Ygg::Agent::Base
       'stop_bits' => 1,
       'parity' => SerialPort::NONE)
 
-    @actor_epoll.add(@serialport, SleepyPenguin::Epoll::IN)
+    actor_epoll.add(@serialport, SleepyPenguin::Epoll::IN)
   end
 
-  def receive(events, io)
+  def actor_receive(events, io)
     case io
     when @serialport
       data = @serialport.read_nonblock(65536)
 
       if !data || data.empty?
-        @actor_epoll.del(@socket)
+        actor_epoll.del(@socket)
         actor_exit
         return
       end
