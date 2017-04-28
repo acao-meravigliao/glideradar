@@ -1,4 +1,3 @@
-#!/usr/bin/env ruby2.1
 #
 # Copyright (C) 2014-2014, Daniele Orlandi
 #
