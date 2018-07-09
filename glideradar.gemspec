@@ -28,8 +28,8 @@ Gem::Specification.new do |s|
   # specify any dependencies here; for example:
   # s.add_development_dependency 'rspec'
 
-  s.add_runtime_dependency 'ygg_agent', '~> 2.7.0'
-  s.add_runtime_dependency 'serialport', '~> 1.3.1'
+  s.add_runtime_dependency 'ygg_agent', '~> 2.8'
+  s.add_runtime_dependency 'serialport', '~> 1.3'
   s.add_runtime_dependency 'activesupport'
   s.add_runtime_dependency 'vihai_io_buffer'
 end
